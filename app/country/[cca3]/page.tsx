@@ -96,7 +96,8 @@ export default async function CountryDetailPage({ params }: Props) {
           {/* Stats grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
             <StatCard icon="🏛️" label="Poytaxt" value={capital} />
-            <StatCard icon="👥" label="Aholi" value={formatNumber(country.population)} />
+        
+<StatCard icon="👥" label="Aholi" value={formatPopulation(country.population)} />
             <StatCard icon="📐" label="Maydon" value={formatArea(country.area)} />
             <StatCard icon="🗣️" label="Tillar" value={languages} />
             <StatCard icon="💰" label="Valyuta" value={currencies} />
