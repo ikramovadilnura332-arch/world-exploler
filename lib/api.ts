@@ -1,17 +1,11 @@
 import { Country } from '@/types';
 
-// Ochiq, barqaror va Next.js uchun eng toza ma'lumotlar to'plami
-const DATA_URL = 'https://raw.githubusercontent.com/mledoze/countries/master/dist/countries.json';
-
-function toArray(data: unknown): Country[] {
-  if (Array.isArray(data)) return data as Country[];
-  if (data && typeof data === 'object') return [data as Country];
-  return [];
-}
+// Dunyo miqyosidagi rasmiy va jonli Rest Countries API manzili
+const API_URL = 'https://restcountries.com/v3.1';
 
 export async function getAllCountries(): Promise<Country[]> {
   try {
-    const response = await fetch(DATA_URL, {
+    const response = await fetch(`${API_URL}/all`, {
       cache: 'no-store'
     });
 
@@ -19,44 +13,30 @@ export async function getAllCountries(): Promise<Country[]> {
       throw new Error(`Xatolik: ${response.status}`);
     }
 
-    const data: unknown = await response.json();
-    const rawCountries = toArray(data);
+    const data = await response.json();
     
     // Loyihangiz kutayotgan Country modeliga ma'lumotlarni moslashtiramiz (Mapping)
-    const countries = rawCountries.map((c: any) => {
-      // mledoze bazasida cca3 yo'q bo'lsa, variantlarni tekshiramiz
-      const cca3Code = c.cca3 || c.cca2 || String(c.numericCode || '');
+    const countries = data.map((c: any) => {
+      const cca3Code = c.cca3 || c.cca2 || '';
       
-      // Bayroq rasmini aniq aniqlash (PNG formatini qidirish)
-      let flagPng = '';
-      if (c.flags && typeof c.flags === 'object') {
-        flagPng = Array.isArray(c.flags) ? c.flags[0] : (c.flags.png || c.flags.svg || '');
-      }
-
-      // Davlat nomini to'g'rilash
-      let commonName = "Noma'lum";
-      if (c.name) {
-        commonName = typeof c.name === 'object' ? (c.name.common || c.name.official || "Noma'lum") : String(c.name);
-      }
-
       return {
         ...c,
         cca3: cca3Code,
         flags: {
-          png: flagPng || `https://flagcdn.com/w320/${(c.cca2 || '').toLowerCase()}.png`, // Agar rasm bo'lmasa flagcdn'dan yuklaydi
-          alt: c.flags?.alt || `${commonName} bayrog'i`
+          png: c.flags?.png || c.flags?.svg || `https://flagcdn.com/w320/${cca3Code.toLowerCase().substring(0, 2)}.png`,
+          alt: c.flags?.alt || `${c.name?.common || 'Davlat'} bayrog'i`
         },
         name: {
-          common: commonName
+          common: c.name?.common || c.name?.official || "Noma'lum"
         },
-        population: Number(c.population) || 0,
+        population: Number(c.population) || 0, // Endi API'dan haqiqiy aholi soni keladi
         region: c.region || 'Boshqa',
         capital: Array.isArray(c.capital) ? c.capital : [c.capital || 'N/A']
       };
     });
 
     // Nom bo'yicha tartiblash (A -> Z)
-    return countries.sort((a, b) => {
+    return countries.sort((a: Country, b: Country) => {
       const nameA = a.name?.common || '';
       const nameB = b.name?.common || '';
       return nameA.localeCompare(nameB);
@@ -69,13 +49,31 @@ export async function getAllCountries(): Promise<Country[]> {
 
 export async function getCountryByCode(code: string): Promise<Country> {
   try {
-    const countries = await getAllCountries();
-    const country = countries.find(c => c.cca3?.toLowerCase() === code?.toLowerCase());
-    
-    if (!country) {
+    const response = await fetch(`${API_URL}/alpha/${code}`, {
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
       throw new Error('Davlat topilmadi');
     }
-    return country;
+
+    const data = await response.json();
+    const c = data[0]; // Rest Countries bitta davlatni massiv ichida qaytaradi
+
+    return {
+      ...c,
+      cca3: c.cca3 || code,
+      flags: {
+        png: c.flags?.png || c.flags?.svg || '',
+        alt: c.flags?.alt || `${c.name?.common} bayrog'i`
+      },
+      name: {
+        common: c.name?.common || "Noma'lum"
+      },
+      population: Number(c.population) || 0,
+      region: c.region || 'Boshqa',
+      capital: Array.isArray(c.capital) ? c.capital : [c.capital || 'N/A']
+    };
   } catch (error) {
     console.error(`Error fetching country ${code}:`, error);
     throw new Error("Davlat ma'lumotlarini olishda xatolik yuz berdi");
